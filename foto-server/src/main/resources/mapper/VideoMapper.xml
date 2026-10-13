@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ff.mapper.VideoMapper">
+
+    <!-- 通用关系切换：点赞 / 收藏 共用这一个SQL -->
+    <insert id="toggleRelation">
+        <if test="type == 1">
+            INSERT INTO ${table} (video_id, user_id)
+            VALUES (#{videoId}, #{userId})
+        </if>
+
+        <if test="type == -1">
+            DELETE FROM ${table}
+            WHERE video_id = #{videoId}
+            AND user_id = #{userId}
+        </if>
+    </insert>
+
+    <!-- 通用判断是否存在：点赞/收藏 共用 -->
+    <select id="checkExist" resultType="int">
+        SELECT COUNT(*) FROM ${table}
+        WHERE video_id = #{videoId} AND user_id = #{userId}
+    </select>
+
+    <!-- 通用更新计数：like_count / collect_count 共用 -->
+    <update id="updateCount">
+        UPDATE video
+        SET ${column} = ${column} + #{num}
+        WHERE id = #{videoId}
+    </update>
+
+</mapper>
