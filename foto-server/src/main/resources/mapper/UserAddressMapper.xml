@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ff.mapper.UserAddressMapper">
+
+
+
+    <!-- UserAddressMapper.xml -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO user_address (
+        user_id, address_detail, phone, receiver,
+        longitude, latitude, tag, is_default, create_time, update_time
+    ) VALUES (
+                 #{userId}, #{addressDetail}, #{phone}, #{receiver},
+                 #{longitude}, #{latitude}, #{tag}, #{isDefault}, #{createTime}, #{updateTime}
+             )
+</insert>
+
+    <update id="update">
+    UPDATE user_address
+    SET address_detail = #{addressDetail},
+        phone = #{phone},
+        receiver = #{receiver},
+        longitude = #{longitude},
+        latitude = #{latitude},
+        tag = #{tag},
+        update_time = #{updateTime}
+    WHERE id = #{id}
+</update>
+
+    <delete id="deleteById">
+    DELETE FROM user_address WHERE id = #{id}
+</delete>
+
+    <select id="selectById" resultType="com.ff.entity.UserAddress">
+        SELECT * FROM user_address WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultType="com.ff.entity.UserAddress">
+        SELECT * FROM user_address WHERE user_id = #{userId} ORDER BY is_default DESC, create_time DESC
+    </select>
+
+    <select id="selectDefaultByUserId" resultType="com.ff.entity.UserAddress">
+        SELECT * FROM user_address WHERE user_id = #{userId} AND is_default = 1 LIMIT 1
+    </select>
+
+    <select id="selectFirstByUserId" resultType="com.ff.entity.UserAddress">
+        SELECT * FROM user_address WHERE user_id = #{userId} ORDER BY create_time ASC LIMIT 1
+    </select>
+
+    <select id="countByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM user_address WHERE user_id = #{userId}
+    </select>
+
+    <update id="cancelDefaultByUserId">
+    UPDATE user_address SET is_default = 0 WHERE user_id = #{userId}
+</update>
+
+    <update id="updateDefault">
+    UPDATE user_address SET is_default = #{isDefault} WHERE id = #{id}
+</update>
+
+</mapper>

@@ -44,21 +44,33 @@ public class JwtTokenUserInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        //1、从请求头中获取令牌
         String token = request.getHeader(jwtProperties.getUserTokenName());
+        log.info("【JWT】URI={}, header字段={}, token={}",
+                request.getRequestURI(),
+                jwtProperties.getUserTokenName(),
+                token);
 
-        //2、校验令牌
         try {
-            log.info("jwt校验:{}", token);
             Claims claims = JwtUtils.parseToken(jwtProperties.getUserSecretKey(), token);
-            Long userId = Long.valueOf(claims.get(JwtClaimsConstant.USER_ID).toString());
-            log.info("当前用户id：", userId);
+            log.info("【JWT】解析成功, claims={}", claims);
 
-            BaseContext.setCurrentId(userId);
-            //3、通过，放行
+            Long currentId = null;
+            if (claims.get(JwtClaimsConstant.USER_ID) != null) {
+                currentId = Long.valueOf(claims.get(JwtClaimsConstant.USER_ID).toString());
+                log.info("【JWT】识别为用户, id={}", currentId);
+            } else if (claims.get(JwtClaimsConstant.RIDER_ID) != null) {
+                currentId = Long.valueOf(claims.get(JwtClaimsConstant.RIDER_ID).toString());
+                log.info("【JWT】识别为骑手, id={}", currentId);
+            } else {
+                log.error("【JWT】claims里既没有userId也没有riderId!");
+            }
+
+            if (currentId != null) {
+                BaseContext.setCurrentId(currentId);
+            }
             return true;
         } catch (Exception ex) {
-            //4、不通过，响应401状态码
+            log.error("【JWT】解析失败: {}", ex.getMessage());
             response.setStatus(401);
             return false;
         }

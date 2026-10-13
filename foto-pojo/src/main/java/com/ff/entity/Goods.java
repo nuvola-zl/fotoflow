@@ -1,8 +1,10 @@
 package com.ff.entity;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -10,47 +12,42 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Goods {
-
-    // 【主键自增】无需传参
+    // 主键 | 必须 | 自增
     private Long id;
 
-    // 【关联视频】视频挂载商品用
-    private Long videoId;
-
-    // 【必填】商品名称（苹果、香蕉、矿泉水）
+    // 商品名称 | 必须 | 无默认
     private String goodsName;
 
-    // 【必填】商品主图
+    // 商品主图 | 非必须 | 默认NULL
     private String goodsImg;
 
-    // 【非必填】商品描述
+    // 商品描述 | 非必须 | 默认NULL
     private String content;
 
-    // ==============================================
-    // 【必填】单价（单位：分）
-    // 例：5.99元/斤 → 存 599
-    // 例：10元/个 → 存 1000
-    // ==============================================
+    // 单价（分） | 必须 | 默认0
     private Integer price;
 
-    // ==============================================
-    // 【必填！！！】单位（关键！解决你的需求）
-    // 可选值：斤、个、件、瓶、kg、袋、盒、箱
-    // ==============================================
+    // 单位 | 必须 | 无默认
     private String unit;
 
-    // 【默认0】库存
+    // 库存 | 必须 | 默认0
     private Integer stock;
 
-    // 【默认0】销量
+    // 销量 | 必须 | 默认0
     private Integer sales;
 
-    // 【默认1】0下架 1上架
+    // 状态 0下架 1上架 | 必须 | 默认1
     private Integer status;
 
-    //关联的商品配置id
+    // 店铺配置ID | 非必须 | 默认NULL
     private Long goodsConfigId;
 
+    // 逻辑删除 0正常 1删除 | 必须 | 默认0
+    private Integer deleted;
+
+    // 创建时间 | 必须 | 默认CURRENT_TIMESTAMP
     private LocalDateTime createTime;
+
+    // 更新时间 | 必须 | 默认CURRENT_TIMESTAMP ON UPDATE
     private LocalDateTime updateTime;
 }

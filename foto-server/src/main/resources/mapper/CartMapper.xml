@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!-- CartMapper.xml -->
+<mapper namespace="com.ff.mapper.CartMapper">
+
+<insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO cart (user_id, goods_id, goods_spec, unit, quantity, is_checked, create_time, update_time)
+    VALUES (#{userId}, #{goodsId}, #{goodsSpec}, #{unit}, #{quantity}, #{isChecked}, #{createTime}, #{updateTime})
+</insert>
+
+<select id="selectById" resultType="com.ff.entity.Cart">
+    SELECT * FROM cart WHERE id = #{id}
+</select>
+
+<select id="selectByUserAndGoods" resultType="com.ff.entity.Cart">
+    SELECT * FROM cart
+    WHERE user_id = #{userId}
+    AND goods_id = #{goodsId}
+    <if test="goodsSpec != null">AND goods_spec = #{goodsSpec}</if>
+    <if test="goodsSpec == null">AND goods_spec IS NULL</if>
+    LIMIT 1
+</select>
+
+<update id="updateQuantity">
+    UPDATE cart
+    SET quantity = #{quantity}, update_time = #{updateTime}
+    WHERE id = #{id}
+</update>
+
+<select id="selectListByUserId" resultType="com.ff.entity.Cart">
+    SELECT * FROM cart WHERE user_id = #{userId} ORDER BY is_checked DESC, create_time DESC
+</select>
+
+<delete id="deleteById">
+    DELETE FROM cart WHERE id = #{id}
+</delete>
+
+<update id="updateChecked">
+    UPDATE cart SET is_checked = #{isChecked} WHERE id = #{id}
+</update>
+
+<delete id="deleteCheckedByUserId">
+    DELETE FROM cart WHERE user_id = #{userId} AND is_checked = 1
+</delete>
+
+</mapper>

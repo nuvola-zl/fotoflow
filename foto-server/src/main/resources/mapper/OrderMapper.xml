@@ -3,17 +3,153 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.ff.mapper.OrderMapper">
 
-    <!-- 新增订单 -->
+    <!-- OrderMapper.xml -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO orders (
-            order_no, user_id, total_amount, status, address_detail, phone, receiver,
-            buyer_longitude, buyer_latitude, shop_longitude, shop_latitude,
-            shop_config_id, create_time, pay_time
-        ) VALUES (
-                     #{orderNo}, #{userId}, #{totalAmount}, #{status}, #{addressDetail}, #{phone}, #{receiver},
-                     #{buyerLongitude}, #{buyerLatitude}, #{shopLongitude}, #{shopLatitude},
-                     #{shopConfigId}, #{createTime}, #{payTime}
-                 )
-    </insert>
+    INSERT INTO orders (
+        order_no, user_id, total_amount, freight_amount, discount_amount, pay_amount,
+        total_quantity, status, remark, receiver, phone, address_detail,
+        buyer_longitude, buyer_latitude, shop_id, shop_name,
+        shop_longitude, shop_latitude, create_time, update_time, deleted
+    ) VALUES (
+                 #{orderNo}, #{userId}, #{totalAmount}, #{freightAmount}, #{discountAmount}, #{payAmount},
+                 #{totalQuantity}, #{status}, #{remark}, #{receiver}, #{phone}, #{addressDetail},
+                 #{buyerLongitude}, #{buyerLatitude}, #{shopId}, #{shopName},
+                 #{shopLongitude}, #{shopLatitude}, #{createTime}, #{updateTime}, #{deleted}
+             )
+</insert>
+
+    <select id="selectById" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders WHERE id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectByOrderNo" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders WHERE order_no = #{orderNo} AND deleted = 0
+    </select>
+
+    <!-- 【核心】乐观锁：只有 status=0 才能更新，防止重复支付 -->
+    <update id="updateOnPay">
+    UPDATE orders
+    SET status = #{status},
+        pay_type = #{payType},
+        pay_time = #{payTime},
+        update_time = NOW()
+    WHERE id = #{id}
+      AND status = 0
+      AND deleted = 0
+</update>
+
+    <select id="selectByUserId" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE user_id = #{userId} AND deleted = 0
+        <if test="status != null">AND status = #{status}</if>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByShopId" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE shop_id = #{shopId} AND deleted = 0
+        <if test="status != null">AND status = #{status}</if>
+        ORDER BY create_time DESC
+    </select>
+
+    <update id="updateDeliveryStart">
+        UPDATE orders
+        SET status = #{status}, delivery_time = #{deliveryTime}, update_time = NOW()
+        WHERE id = #{id} AND status = 1
+    </update>
+
+
+    <!-- 用户确认收货：3→4 -->
+    <update id="updateReceiveConfirm">
+        UPDATE orders
+        SET status = #{status},      <!-- 4 -->
+        receive_time = #{receiveTime},
+        finish_time = #{finishTime},
+        update_time = NOW()
+        WHERE id = #{id}
+        AND status = 3             <!-- 必须是派送中才能确认收货 -->
+        AND deleted = 0
+    </update>
+
+    <!-- OrderMapper.xml 追加 -->
+
+    <!-- 查询超时订单：status=0 且 create_time < 超时时间点 -->
+    <select id="selectTimeoutOrders" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE status = 0
+          AND deleted = 0
+          AND create_time <![CDATA[ < ]]> #{timeoutTime}
+    </select>
+
+    <!-- OrderMapper.xml -->
+    <select id="selectTimeoutNotifyList" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE status = 0
+          AND deleted = 0
+          AND create_time BETWEEN #{startTime} AND #{endTime}
+    </select>
+
+    <!-- 取消订单：乐观锁，只有 status=0 才能更新 -->
+    <update id="updateCancelStatus">
+        UPDATE orders
+        SET status = #{status}, update_time = NOW()
+        WHERE id = #{id} AND status = 0 AND deleted = 0
+    </update>
+
+    <!-- OrderMapper.xml 里追加 -->
+
+    <!-- 待接单池 -->
+    <select id="selectPendingOrders" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE status = 2
+          AND deleted = 0
+          AND rider_id IS NULL
+        ORDER BY create_time ASC
+    </select>
+
+    <!-- 骑手抢单：只绑骑手，不改状态 -->
+    <update id="updateRider">
+        UPDATE orders
+        SET rider_id = #{riderId},
+        rider_name = #{riderName},
+        rider_phone = #{riderPhone},
+        rider_take_time = #{riderTakeTime},
+        update_time = NOW()
+        WHERE id = #{id}
+        AND rider_id IS NULL      <!-- 乐观锁：未绑定骑手 -->
+        AND status = 2            <!-- 必须是已发货状态 -->
+        AND deleted = 0
+    </update>
+
+    <!-- 开始配送：2→3 -->
+    <update id="updateStartDelivery">
+        UPDATE orders
+        SET status = #{status},      <!-- 3 -->
+        update_time = NOW()
+        WHERE id = #{id}
+        AND status = 2             <!-- 必须是已发货才能变派送中 -->
+        AND rider_id IS NOT NULL   <!-- 必须已绑定骑手 -->
+        AND deleted = 0
+    </update>
+
+    <!-- 骑手今日订单 -->
+    <select id="selectByRiderIdAndToday" resultType="com.ff.entity.Orders">
+        SELECT * FROM orders
+        WHERE rider_id = #{riderId}
+          AND deleted = 0
+          AND DATE(create_time) = CURDATE()
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 统一修改订单状态 -->
+    <update id="updateOrderStatus">
+        UPDATE orders
+        SET status = #{status},
+            update_time = now()
+        WHERE id = #{id}
+    </update>
+
+
+
 
 </mapper>

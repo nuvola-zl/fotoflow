@@ -1,8 +1,10 @@
 package com.ff.entity;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -10,27 +12,39 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class OrderItem {
-    // 【主键自增】
+    // 主键 | 必须 | 自增
     private Long id;
 
-    // 【必填】关联订单号
-    private String orderNo;
+    // 订单ID | 必须 | 无默认
+    private Long orderId;
 
-    // 【必填】商品ID
+    // 商品ID | 必须 | 无默认
     private Long goodsId;
 
-    // 【必填】商品名称 下单快照
+    // 商品名称 | 必须 | 无默认
     private String goodsName;
 
-    // 【必填】商品图片 下单快照
+    // 商品图片 | 非必须 | 默认NULL
     private String goodsImg;
 
-    // 【必填】下单时单价
+    // 商品规格 | 非必须 | 默认NULL
+    private String goodsSpec;
+
+    // 单位 | 非必须 | 默认NULL
+    private String unit;
+
+    // 单价(分) | 必须 | 无默认
     private Integer price;
 
-    // 【必填】购买数量
-    private Integer count;
+    // 数量 | 必须 | 无默认
+    private Integer quantity;
 
-    // 【数据库默认当前时间】
+    // 小计金额(分) | 必须 | 无默认
+    private Integer subtotal;
+
+    // 配送状态 | 必须 | 默认0
+    private Integer deliveryStatus;
+
+    // 创建时间 | 必须 | 默认CURRENT_TIMESTAMP
     private LocalDateTime createTime;
 }

@@ -32,4 +32,6 @@ public class Video {
 
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+
+    private String status = "PENDING";  // 新字段，默认 PENDING,解析视频时长是否成功状态
 }

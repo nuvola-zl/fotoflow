@@ -28,10 +28,21 @@ public class Result<T> implements Serializable {
         return result;
     }
 
+//    public static <T> Result<T> error(String msg) {
+//        Result result = new Result();
+//        result.msg = msg;
+//        result.code = 0;
+//        return result;
+//    }
+
     public static <T> Result<T> error(String msg) {
-        Result result = new Result();
+        return error(0, msg);
+    }
+
+    public static <T> Result<T> error(Integer code, String msg) {
+        Result<T> result = new Result<>();
+        result.code = code;
         result.msg = msg;
-        result.code = 0;
         return result;
     }
 

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!-- RiderLocationSummaryMapper.xml -->
+<mapper namespace="com.ff.mapper.RiderLocationSummaryMapper">
+
+    <!-- 保存或更新（存在则覆盖，不存在则插入） -->
+    <insert id="saveOrUpdate">
+        INSERT INTO rider_location_summary (
+            order_id, rider_id, current_lng, current_lat,
+            location_time, eta_minutes, update_time
+        ) VALUES (
+                     #{orderId}, #{riderId}, #{currentLng}, #{currentLat},
+                     #{locationTime}, #{etaMinutes}, #{updateTime}
+                 )
+            ON DUPLICATE KEY UPDATE
+                                 rider_id = #{riderId},
+                                 current_lng = #{currentLng},
+                                 current_lat = #{currentLat},
+                                 location_time = #{locationTime},
+                                 eta_minutes = #{etaMinutes},
+                                 update_time = NOW()
+    </insert>
+
+    <select id="selectByOrderId" resultType="com.ff.entity.RiderLocationSummary">
+        SELECT * FROM rider_location_summary WHERE order_id = #{orderId}
+    </select>
+
+
+</mapper>

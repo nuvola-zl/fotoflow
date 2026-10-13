@@ -5,46 +5,53 @@ import com.ff.entity.*;
 import com.ff.vo.BarrageVO;
 import com.ff.vo.VideoVO;
 
-
 import java.util.List;
 
+/**
+ * 视频业务接口
+ * 功能：视频发布、点赞、收藏、弹幕、首页推荐等
+ */
 public interface VideoService {
-    // 视频发布
+
+    /**
+     * 发布视频
+     * @param videoPublishDto 视频发布参数（标题、内容、视频地址等）
+     */
     void publishVideo(VideoPublishDto videoPublishDto);
 
-    // 获取首页最新一条视频
+    /**
+     * 获取首页【最新/随机】一条视频
+     * 用于首页刷视频展示
+     * @return VideoVO 视频详情（包含是否点赞、是否收藏）
+     */
     VideoVO getLatestOne();
 
-    // 发送弹幕
-    void sendBarrage(Barrage barrage,Long videoId);
+    /**
+     * 发送弹幕
+     * @param barrage 弹幕内容、颜色、出现时间等信息
+     * @param videoId 视频ID
+     */
+    void sendBarrage(Barrage barrage, Long videoId);
 
-    // 获取视频弹幕
+    /**
+     * 获取某个视频的所有弹幕列表
+     * @param videoId 视频ID
+     * @return 弹幕VO列表，返回给前端
+     */
     List<BarrageVO> getBarrages(Long videoId);
 
+    /**
+     * 点赞 / 取消点赞（二合一）
+     * @param id 视频ID
+     * @return true=点赞成功 false=取消点赞成功
+     */
     Boolean updateLikeAll(Long id);
 
-
+    /**
+     * 收藏 / 取消收藏（二合一）
+     * @param id 视频ID
+     * @return true=收藏成功 false=取消收藏成功
+     */
     Boolean updateCollectAll(Long id);
 
-
-    // 获取视频评论
-    List<Comment> listCommentsByWorkId(Long id);
-
-    // 添加评论
-    void addComment(Comment comment);
-
-    // 更新视频评论数
-    void addCommentNum(Long id);
-
-    //根据作品id查询作者
-    Video getVideoById(Long id);
-
-    //根据用户名查询用户ID
-    User getUserByUsername(String username);
-
-    //添加信息
-    void addAtMessage(Message msg);
-
-   //异步处理视频时长
-    void updateById(Video video);
 }

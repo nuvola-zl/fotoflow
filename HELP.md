@@ -16,3 +16,20 @@ parent.
 To prevent this, the project POM contains empty overrides for these elements.
 If you manually switch to a different parent and actually want the inheritance, you need to remove those overrides.
 
+[//]: # (.env 文件)
+
+[//]: # (↓ （变成环境变量）)
+
+[//]: # (系统环境变量 SPRING_REDIS_PASSWORD)
+
+[//]: # (↓ （SpringBoot 自动映射）)
+
+[//]: # (spring.redis.password)
+
+[//]: # (↓ （自动注入）)
+
+[//]: # (RedisProperties.password)
+
+[//]: # (↓)
+
+[//]: # (RedissonConfig → 拿去连接 Redis)

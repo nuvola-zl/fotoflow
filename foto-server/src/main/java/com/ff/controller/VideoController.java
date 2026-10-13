@@ -1,36 +1,28 @@
 package com.ff.controller;
 import com.ff.constant.MessageConstant;
-import com.ff.constant.RedisKeyConstant;
-import com.ff.context.BaseContext;
 import com.ff.dto.VideoPublishDto;
 import com.ff.entity.*;
-import com.ff.exception.CollectSetException;
-import com.ff.exception.LikeSetException;
 import com.ff.result.Result;
 import com.ff.service.VideoService;
-import com.ff.utils.VideoDurationUtil;
-import com.ff.utils.WebSocketServer;
 import com.ff.vo.BarrageVO;
 import com.ff.vo.VideoVO;
 import jakarta.annotation.Resource;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.concurrent.*;
-
 @RestController
 @RequestMapping("/video")
+@RequiredArgsConstructor
 public class VideoController {
 
-
-    @Resource
-    private VideoService videoService;
+    private final VideoService videoService;
 
     /**
      * 发布视频
      */
     @PostMapping("/publish")
     public Result<String> publish(
-            VideoPublishDto videoPublishDto
+            @RequestBody VideoPublishDto videoPublishDto
     )  {
         // 保存到数据库
         videoService.publishVideo(videoPublishDto);
@@ -68,70 +60,11 @@ public class VideoController {
 
 
     // 收藏
-    @PostMapping("collect/{id}")
+    @PostMapping("/collect/{id}")
     public Result<Boolean> videoCollect(@PathVariable Long id) {
 
         return Result.success(videoService.updateCollectAll(id));
 
     }
-
-//    // 评论
-//    //点击评论按钮，先回显所有评论，再显示评论框
-//    //作品id
-//    @GetMapping("comments/{id}")
-//    public Result<List<Comment>> comment(@PathVariable Long id) {
-//        List<Comment> comments = videoService.listCommentsByWorkId(id);
-//        return Result.success(comments);
-//    }
-//    //在评论框中输入评论内容，点击发送生成评论
-//    @PostMapping("comment/{id}")
-//    public Result<String> addComment(@PathVariable Long id, @RequestBody Comment comment) {
-//        // 从token中获取userId
-//        Long userId = BaseContext.getCurrentId();
-//
-//        comment.setVideoId(id);
-//        comment.setUserId(userId);
-//
-//        videoService.addComment(comment);
-//
-//        //增加评论数
-//        videoService.addCommentNum(id);
-//
-//        // 根据作品ID查作者ID → 推送给作者
-//        Video video = videoService.getVideoById(id);
-//        WebSocketServer.sendToUser(video.getUserId(), "newComment");
-//
-//
-//        String content = comment.getContent();
-//
-//        // 正则匹配：@xxx （匹配 @ + 非空格字符）
-//        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("@(\\S+)");
-//        java.util.regex.Matcher matcher = pattern.matcher(content);
-//
-//        // 遍历所有被 @ 的人
-//        while (matcher.find()) {
-//            // 获取 @ 的用户名
-//            String username = matcher.group(1);
-//
-//            //根据用户名查询用户ID
-//            User atUser = videoService.getUserByUsername(username);
-//            if (atUser == null) continue; // 找不到就跳过
-//            Long atUserId = atUser.getId();
-//
-//            // 给自己发消息提醒：你被 @ 了
-//            Message msg = new Message();
-//            msg.setFromUserId(userId);       // 谁@的
-//            msg.setToUserId(atUserId);       // 被@的人
-//            msg.setContent("有人在评论中@了你：" + content);
-//            msg.setIsRead(0);
-//            videoService.addAtMessage(msg);  // 保存@消息
-//
-//            // WebSocket 推送提醒
-//            WebSocketServer.sendToUser(atUserId, "newAt");
-//        }
-//        // ====================== @用户功能 结束 ======================
-//        return Result.success("评论成功");
-//        //之后刷新品论界面，显示最新的评论
-//    }
 
 }

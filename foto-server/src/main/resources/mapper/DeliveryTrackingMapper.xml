@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ff.mapper.DeliveryTrackingMapper">
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO delivery_tracking (
+            order_id, rider_id, current_longitude, current_latitude,
+            location_time, speed, distance_left, create_time
+        ) VALUES (
+                     #{orderId}, #{riderId}, #{currentLongitude}, #{currentLatitude},
+                     #{locationTime}, #{speed}, #{distanceLeft}, #{createTime}
+                 )
+    </insert>
+
+    <select id="selectLatestByOrderId" resultType="com.ff.entity.DeliveryTracking">
+        SELECT * FROM delivery_tracking
+        WHERE order_id = #{orderId}
+        ORDER BY location_time DESC
+            LIMIT 1
+    </select>
+
+    <select id="selectByOrderId" resultType="com.ff.entity.DeliveryTracking">
+        SELECT *
+        FROM delivery_tracking
+        WHERE order_id = #{orderId}
+        ORDER BY location_time ASC
+    </select>
+
+
+</mapper>

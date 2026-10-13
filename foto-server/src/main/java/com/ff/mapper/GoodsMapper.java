@@ -1,59 +1,68 @@
 package com.ff.mapper;
 
-import com.ff.dto.GoodsPageDto;
-import com.ff.dto.GoodsUpdateDto;
+import com.ff.dto.GoodsQueryDto;
 import com.ff.entity.Goods;
-import com.ff.entity.ShopConfig;
 import org.apache.ibatis.annotations.Mapper;
-import com.github.pagehelper.Page;
-import org.springframework.data.repository.query.Param;
+import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
+/**
+ * 商品数据访问层
+ */
 @Mapper
 public interface GoodsMapper {
-    /**
-     * 关联视频id查询所有的商品
-     * @param dto
-     * @return
-     */
-    Page<Goods> selectGoodsRandom(
-            @Param("dto") GoodsPageDto dto
-    );
 
     /**
-     * 根据ID修改店铺配置
-     * @param shopConfig 店铺配置实体
+     * 插入商品
      */
-    void updateShopConfig(ShopConfig shopConfig);
+    int insert(Goods goods);
 
     /**
-     * 新增商品
-     * @param goods 商品实体
+     * 根据ID查询商品（包含已删除的，用于商家管理）
      */
-    void insert(Goods goods);
+    Goods selectById(Long id);
 
     /**
-     * 根据ID查询商品
-     * @param id 商品ID
-     * @return 商品实体
+     * 更新商品信息
      */
-    Goods selectByPrimaryKey(Long id);
+    int update(Goods goods);
 
     /**
-     * 根据商品配置ID查询店铺配置
-     * @param goodsConfigId 商品配置ID
-     * @return 店铺配置实体
+     * 逻辑删除商品（将 deleted 置为 1）
      */
-    ShopConfig selectShopConfig(Long goodsConfigId);
+    int logicDelete(@Param("id") Long id);
 
-//=----------------------
     /**
-     * 新增店铺配置
-     * @param shopConfig 店铺配置实体
+     * 修改商品上下架状态
      */
-    void insertShopConfig(ShopConfig shopConfig);
+    int updateStatus(@Param("id") Long id, @Param("status") Integer status);
 
-    void updateGoods(GoodsUpdateDto goodsUpdateDto);
+    /**
+     * 商家端条件查询商品列表
+     * 查询范围限定为某个店铺（通过 shopConfigId）
+     */
+    List<Goods> selectByCondition(GoodsQueryDto dto);
 
-    int decreaseStock(@Param("id") Long id, @Param("count") Integer count);
+    /**
+     * 用户端查询商品列表
+     * 强制过滤：status=1（上架）且 deleted=0（未删除）
+     */
+    List<Goods> selectUserGoodsList(GoodsQueryDto dto);
 
+    /**
+     * 扣减库存（乐观锁）
+     * WHERE stock >= #{quantity} 防止超卖
+     */
+    int decreaseStock(@Param("goodsId") Long goodsId, @Param("quantity") Integer quantity);
+
+    /**
+     * 回滚库存（取消订单时调用）
+     * 将商品库存加回去
+     *
+     * @param goodsId 商品ID
+     * @param quantity 回滚数量
+     * @return 影响行数
+     */
+    int increaseStock(@Param("goodsId") Long goodsId, @Param("quantity") Integer quantity);
 }

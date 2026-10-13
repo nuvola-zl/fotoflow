@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!-- CartMapper.xml -->
+<mapper namespace="com.ff.mapper.RiderMapper">
+
+
+
+    <select id="selectById" resultType="com.ff.entity.Rider">
+        SELECT * FROM rider WHERE id = #{id}
+    </select>
+
+    <select id="selectByPhone" resultType="com.ff.entity.Rider">
+        SELECT * FROM rider WHERE phone = #{phone}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO rider (
+        phone, password, real_name, avatar, status,
+        rating, total_orders, today_orders,
+        create_time, update_time
+    ) VALUES (
+                 #{phone}, #{password}, #{realName}, #{avatar}, #{status},
+                 #{rating}, #{totalOrders}, #{todayOrders},
+                 #{createTime}, #{updateTime}
+             )
+</insert>
+
+    <update id="updateStatus">
+        UPDATE rider SET status = #{status}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <update id="incrTodayOrders">
+        UPDATE rider SET today_orders = today_orders + 1 WHERE id = #{id}
+    </update>
+
+    <update id="incrTotalOrders">
+        UPDATE rider SET total_orders = total_orders + 1 WHERE id = #{id}
+    </update>
+
+    <update id="resetTodayOrders">
+        UPDATE rider SET today_orders = 0
+    </update>
+
+
+</mapper>

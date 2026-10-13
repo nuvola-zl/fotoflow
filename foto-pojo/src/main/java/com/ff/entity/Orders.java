@@ -3,6 +3,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Data
@@ -10,46 +11,100 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Orders {
-    // 【主键自增】
+    // 主键 | 必须 | 自增
     private Long id;
 
-    // 【必填】唯一订单号 后端生成
+    // 订单号 | 必须 | 无默认
     private String orderNo;
 
-    // 【必填】下单用户ID
+    // 用户ID | 必须 | 无默认
     private Long userId;
 
-    // 【必填】订单总金额 分
+    // 商品总金额(分) | 必须 | 默认0
     private Integer totalAmount;
 
-    // 【数据库默认0】0待付款 1已付款待配送 2配送中 3已完成
+    // 运费(分) | 必须 | 默认0
+    private Integer freightAmount;
+
+    // 优惠金额(分) | 必须 | 默认0
+    private Integer discountAmount;
+
+    // 实付金额(分) | 必须 | 默认0
+    private Integer payAmount;
+
+    // 总件数 | 必须 | 默认0
+    private Integer totalQuantity;
+
+    // 订单状态 | 必须 | 默认0
     private Integer status;
 
-    // 【必填】收货详细地址
-    private String addressDetail;
-    // 【必填】收件电话
-    private String phone;
-    // 【必填】收件人
+    // 用户备注 | 非必须 | 默认NULL
+    private String remark;
+
+    // 收件人 | 必须 | 无默认
     private String receiver;
 
-    // 【必填】买家收货地址经纬度
+    // 电话 | 必须 | 无默认
+    private String phone;
+
+    // 详细地址 | 必须 | 无默认
+    private String addressDetail;
+
+    // 买家经度 | 非必须 | 默认NULL
     private Double buyerLongitude;
+
+    // 买家纬度 | 非必须 | 默认NULL
     private Double buyerLatitude;
-    // 【必填】店铺经纬度 下单时从shop_config复制过来存快照
+
+    // 店铺ID | 必须 | 无默认
+    private Long shopId;
+
+    // 店铺名称 | 非必须 | 默认NULL
+    private String shopName;
+
+    // 店铺经度 | 非必须 | 默认NULL
     private Double shopLongitude;
+
+    // 店铺纬度 | 非必须 | 默认NULL
     private Double shopLatitude;
 
-    // 【必填】店铺配置ID
-    private Long shopConfigId;
+    // 支付方式 1微信 2支付宝 | 非必须 | 默认NULL
+    private Integer payType;
 
-    // 【非必填】配送经纬度（商家/骑手位置）
-    private Double deliveryLongitude;
-    private Double deliveryLatitude;
-
-    // 【数据库默认当前时间】下单时间
-    private LocalDateTime createTime;
-    // 【非必填】付款时间
+    // 支付时间 | 非必须 | 默认NULL
     private LocalDateTime payTime;
-    // 【非必填】完成时间
+
+    // 发货时间 | 非必须 | 默认NULL
+    private LocalDateTime deliveryTime;
+
+    // 签收时间 | 非必须 | 默认NULL
+    private LocalDateTime receiveTime;
+
+    // 完成时间 | 非必须 | 默认NULL
     private LocalDateTime finishTime;
+
+    // 创建时间 | 必须 | 默认CURRENT_TIMESTAMP
+    private LocalDateTime createTime;
+
+    // 更新时间 | 必须 | 默认CURRENT_TIMESTAMP ON UPDATE
+    private LocalDateTime updateTime;
+
+    // 逻辑删除 | 必须 | 默认0
+    private Integer deleted;
+
+
+    // ====================== 【骑手相关字段 - 新增】 ======================
+    // 骑手ID | 非必须 | 默认NULL
+    private Long riderId;
+
+    // 骑手姓名快照 | 非必须 | 默认NULL
+    private String riderName;
+
+    // 骑手电话快照 | 非必须 | 默认NULL
+    private String riderPhone;
+
+    // 骑手接单时间 | 非必须 | 默认NULL
+    private LocalDateTime riderTakeTime;
+
+
 }

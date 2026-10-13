@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.ff.mapper.ShopMapper">
+
+
+    <update id="updateShopConfig">
+        UPDATE shop_config
+        SET shop_name     = #{shopName},
+            shop_address = #{shopAddress},
+            longitude    = #{longitude},
+            latitude     = #{latitude},
+            update_time  = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <select id="selectShopConfig" resultType="com.ff.entity.ShopConfig">
+        SELECT * FROM shop_config WHERE id = #{goodsConfigId}
+    </select>
+
+    <!-- 新增店铺配置 -->
+    <insert id="insertShopConfig" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO shop_config (shop_name, shop_address, longitude, latitude, update_time)
+        VALUES (#{shopName}, #{shopAddress}, #{longitude}, #{latitude}, #{updateTime})
+    </insert>
+
+</mapper>

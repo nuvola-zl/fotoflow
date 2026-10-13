@@ -1,86 +1,94 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ff.mapper.GoodsMapper">
 
-    <!-- 原来：根据 videoId 查询商品 -->
-    <!-- 现在：去掉 videoId，直接查询【所有上架商品】-->
-    <select id="selectGoodsRandom" resultType="com.ff.entity.Goods">
-        SELECT g.*
-        FROM goods g
-        WHERE g.status = 1  <!-- 只查询上架的商品 -->
-        ORDER BY RAND() ASC <!-- 不按视频关联，直接随机展示商品 -->
-    </select>
-
-    <update id="updateShopConfig">
-        UPDATE shop_config
-        SET shop_name     = #{shopName},
-            shop_address = #{shopAddress},
-            longitude    = #{longitude},
-            latitude     = #{latitude},
-            update_time  = #{updateTime}
-        WHERE id = #{id}
-    </update>
-
-    <insert id="insert">
-        INSERT INTO goods
-        (
-            video_id,
-            goods_name,
-            goods_img,
-            content,
-            price,
-            unit,
-            stock,
-            goods_config_id,
-            create_time
-        )
-        VALUES
-            (
-                #{videoId},
-                #{goodsName},
-                #{goodsImg},
-                #{content},
-                #{price},
-                #{unit},
-                #{stock},
-                #{goodsConfigId},
-                #{createTime}
-            )
+    <!-- 插入商品 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO goods (
+            goods_name, goods_img, content, price, unit,
+            stock, sales, status, goods_config_id, deleted,
+            create_time, update_time
+        ) VALUES (
+                     #{goodsName}, #{goodsImg}, #{content}, #{price}, #{unit},
+                     #{stock}, #{sales}, #{status}, #{goodsConfigId}, #{deleted},
+                     #{createTime}, #{updateTime}
+                 )
     </insert>
 
-    <update id="updateGoods">
-        UPDATE goods
-        SET goods_name = #{goodsName},
-            goods_img  = #{goodsImg},
-            content    = #{content},
-            price      = #{price},
-            unit       = #{unit},
-            stock      = #{stock},
-            status     = #{status},
-            update_time = NOW()
-        WHERE id = #{id}
-    </update>
-
-    <update id="decreaseStock">
-        UPDATE goods
-        SET stock = stock - #{count},
-            sales = IFNULL(sales, 0) + #{count}
-        WHERE id = #{id} AND stock >= #{count}
-    </update>
-
-    <select id="selectByPrimaryKey" resultType="com.ff.entity.Goods">
+    <!-- 根据ID查询商品（包含已删除的，商家管理需要） -->
+    <select id="selectById" resultType="com.ff.entity.Goods">
         SELECT * FROM goods WHERE id = #{id}
     </select>
 
-    <select id="selectShopConfig" resultType="com.ff.entity.ShopConfig">
-        SELECT * FROM shop_config WHERE id = #{goodsConfigId}
+    <!-- 更新商品信息 -->
+    <update id="update">
+        UPDATE goods
+        <set>
+            <if test="goodsName != null">goods_name = #{goodsName},</if>
+            <if test="goodsImg != null">goods_img = #{goodsImg},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="unit != null">unit = #{unit},</if>
+            <if test="stock != null">stock = #{stock},</if>
+            update_time = #{updateTime}
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 逻辑删除：将 deleted 置为 1，非物理删除 -->
+    <update id="logicDelete">
+        UPDATE goods SET deleted = 1, status = 0, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <!-- 修改上下架状态 -->
+    <update id="updateStatus">
+        UPDATE goods SET status = #{status}, update_time = NOW() WHERE id = #{id}
+    </update>
+
+    <!-- 商家端条件查询：限定店铺，可模糊搜索名称，可按状态筛选 -->
+    <select id="selectByCondition" resultType="com.ff.entity.Goods">
+        SELECT * FROM goods
+        WHERE deleted = 0
+        AND goods_config_id = #{shopConfigId}
+        <if test="goodsName != null and goodsName != ''">
+            AND goods_name LIKE CONCAT('%', #{goodsName}, '%')
+        </if>
+        <if test="status != null">
+            AND status = #{status}
+        </if>
+        ORDER BY create_time DESC
     </select>
 
-    <!-- 新增店铺配置 -->
-    <insert id="insertShopConfig" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO shop_config (user_id, shop_name, shop_address, longitude, latitude, update_time)
-        VALUES (#{userId}, #{shopName}, #{shopAddress}, #{longitude}, #{latitude}, #{updateTime})
-    </insert>
+    <!-- 用户端查询：强制只查上架且未删除的商品 -->
+    <select id="selectUserGoodsList" resultType="com.ff.entity.Goods">
+        SELECT * FROM goods
+        WHERE deleted = 0
+        AND status = 1
+        <if test="shopConfigId != null">
+            AND goods_config_id = #{shopConfigId}
+        </if>
+        <if test="goodsName != null and goodsName != ''">
+            AND goods_name LIKE CONCAT('%', #{goodsName}, '%')
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <!-- 扣减库存（乐观锁）：只有 stock >= quantity 才扣成功 -->
+    <update id="decreaseStock">
+        UPDATE goods
+        SET stock = stock - #{quantity},
+            sales = sales + #{quantity}
+        WHERE id = #{goodsId}
+          AND stock >= #{quantity}
+          AND deleted = 0
+    </update>
+
+
+    <!-- 回滚库存：取消订单时把库存加回来 -->
+    <update id="increaseStock">
+        UPDATE goods
+        SET stock = stock + #{quantity}
+        WHERE id = #{goodsId}
+    </update>
 
 </mapper>

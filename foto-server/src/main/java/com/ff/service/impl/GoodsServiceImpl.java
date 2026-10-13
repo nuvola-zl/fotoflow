@@ -1,397 +1,296 @@
 package com.ff.service.impl;
 
-import com.ff.constant.MessageConstant;
-import com.ff.constant.OrderStatusConstant;
 import com.ff.context.BaseContext;
-import com.ff.dto.*;
+import com.ff.dto.GoodsAddDto;
+import com.ff.dto.GoodsQueryDto;
+import com.ff.dto.GoodsUpdateDto;
 import com.ff.entity.Goods;
-import com.ff.entity.OrderItem;
-import com.ff.entity.Orders;
 import com.ff.entity.ShopConfig;
-import com.ff.entity.UserAddress;
-import com.ff.exception.EmptyException;
+import com.ff.exception.BaseException;
+import com.ff.exception.CodeException;
 import com.ff.mapper.GoodsMapper;
-import com.ff.mapper.OrderItemMapper;
-import com.ff.mapper.OrderMapper;
-import com.ff.mapper.ShopMapper;
-import com.ff.mapper.UserAddressMapper;
+import com.ff.mapper.ShopConfigMapper;
 import com.ff.result.PageResult;
 import com.ff.service.GoodsService;
-import com.ff.vo.MyOrdersVO;
-import com.ff.vo.OrderItemVO;
-import com.ff.vo.ShopConfigShowConfigVO;
-import com.ff.vo.UserAddressVO;
+import com.ff.utils.RedisUtil;
+import com.ff.vo.GoodsDetailVO;
+import com.ff.vo.GoodsPageVO;
+
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+/**
+ * 商品服务实现类
+ * 负责商品全生命周期管理：创建、修改、删除、上下架、查询
+ */
 @Service
+@RequiredArgsConstructor
 public class GoodsServiceImpl implements GoodsService {
 
-    @Autowired
-    private GoodsMapper goodsMapper;
+    private final GoodsMapper goodsMapper;
 
-    @Autowired
-    private OrderMapper orderMapper;
+    private final ShopConfigMapper shopConfigMapper;
 
-    @Autowired
-    private OrderItemMapper orderItemMapper;
+    private final RedisUtil redisUtil;
 
-    @Autowired
-    private ShopMapper shopMapper;
+    /** 商品详情缓存时间：30 分钟 */
+    private static final long GOODS_CACHE_MINUTES = 30;
 
-    @Autowired
-    private UserAddressMapper userAddressMapper;
-
+    /**
+     * 商家新增商品
+     * 流程：
+     * 1. 获取当前登录商家ID
+     * 2. 校验商家是否已配置店铺（通过 userId 查 shop_config）
+     * 3. 构建商品实体，设置默认状态（上架、未删除）
+     * 4. 写入数据库
+     * 5. 返回商品详情VO
+     */
     @Override
-    public PageResult selectGoodsRandom(GoodsPageDto goodsPageDto) {
-        PageHelper.startPage(goodsPageDto.getPage(), goodsPageDto.getPageSize());
-        Page<Goods> goodsPage = goodsMapper.selectGoodsRandom(goodsPageDto);
-        return new PageResult(goodsPage.getTotal(), goodsPage.getResult());
-    }
+    public GoodsDetailVO addGoods(GoodsAddDto dto) {
+        Long userId = BaseContext.getCurrentId();
+        ShopConfig shop = shopConfigMapper.selectByUserId(userId);
+        if (shop == null) {
+            throw new BaseException(CodeException.NOT_COMPLETED, "请先配置店铺信息");
+        }
 
-    @Override
-    public void updateShopConfig(ShopConfigDto shopConfigDto) {
-        ShopConfig shopConfig = ShopConfig.builder()
-                .id(shopConfigDto.getId())
-                .shopName(shopConfigDto.getShopName())
-                .shopAddress(shopConfigDto.getShopAddress())
-                .longitude(shopConfigDto.getLongitude())
-                .latitude(shopConfigDto.getLatitude())
-                .updateTime(LocalDateTime.now())
-                .build();
-        goodsMapper.updateShopConfig(shopConfig);
-    }
+        Goods goods = new Goods();
+        BeanUtils.copyProperties(dto, goods);
+        goods.setGoodsConfigId(shop.getId());
+        goods.setStatus(1);
+        goods.setDeleted(0);
+        goods.setSales(0);
+        goods.setCreateTime(LocalDateTime.now());
+        goods.setUpdateTime(LocalDateTime.now());
 
-    @Override
-    public void addGoods(GoodsAddDto goodsAddDto) {
-        Goods goods = Goods.builder()
-                .videoId(goodsAddDto.getVideoId())
-                .goodsName(goodsAddDto.getGoodsName())
-                .goodsImg(goodsAddDto.getGoodsImg())
-                .price(goodsAddDto.getPrice())
-                .unit(goodsAddDto.getUnit())
-                .content(goodsAddDto.getContent())
-                .stock(goodsAddDto.getStock() == null ? 0 : goodsAddDto.getStock())
-                .status(1)
-                .createTime(LocalDateTime.now())
-                .goodsConfigId(goodsAddDto.getGoodsConfigId())
-                .build();
         goodsMapper.insert(goods);
-    }
 
-    @Override
-    public OrderItemVO addMyGoods(Long id) {
-        return addMyGoods(id, null);
-    }
+        // 新增商品直接写入缓存（预热），避免首次查询击穿数据库
+        GoodsDetailVO vo = toDetailVO(goods);
+        redisUtil.setGoods(goods.getId(), vo, GOODS_CACHE_MINUTES);
 
-    @Override
-    public OrderItemVO addMyGoods(Long id, Long addressId) {
-        Long userId = BaseContext.getCurrentId();
-        Goods goods = goodsMapper.selectByPrimaryKey(id);
-        if (goods == null) {
-            throw new EmptyException(MessageConstant.GOODS_NOT_EXIST);
-        }
-
-        OrderItemVO orderItemVO = new OrderItemVO();
-        String orderNo = "order:" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-        BeanUtils.copyProperties(goods, orderItemVO);
-
-        orderItemVO.setOrderNo(orderNo);
-        orderItemVO.setUserId(userId);
-        orderItemVO.setGoodsId(goods.getId());
-        orderItemVO.setCount(1);
-        orderItemVO.setTotalAmount(goods.getPrice());
-        orderItemVO.setStatus(OrderStatusConstant.PENDING_PAY);
-        orderItemVO.setGoodsConfigId(goods.getGoodsConfigId());
-        orderItemVO.setCreateTime(LocalDateTime.now());
-
-        fillAddress(orderItemVO, userId, addressId);
-
-        ShopConfig shopConfig = goodsMapper.selectShopConfig(goods.getGoodsConfigId());
-        if (shopConfig != null) {
-            orderItemVO.setShopLongitude(shopConfig.getLongitude());
-            orderItemVO.setShopLatitude(shopConfig.getLatitude());
-        }
-        return orderItemVO;
-    }
-
-    private void fillAddress(OrderItemVO orderItemVO, Long userId, Long addressId) {
-        UserAddress address = null;
-        if (addressId != null) {
-            address = userAddressMapper.selectByIdAndUserId(addressId, userId);
-            if (address == null) {
-                throw new EmptyException(MessageConstant.USER_ADDRESS_NOT_EXIST);
-            }
-        } else {
-            address = userAddressMapper.selectDefaultByUserId(userId);
-        }
-        if (address != null) {
-            orderItemVO.setAddressDetail(address.getAddressDetail());
-            orderItemVO.setPhone(address.getPhone());
-            orderItemVO.setReceiver(address.getReceiver());
-            orderItemVO.setBuyerLongitude(address.getLongitude());
-            orderItemVO.setBuyerLatitude(address.getLatitude());
-        } else {
-            orderItemVO.setAddressDetail("");
-            orderItemVO.setPhone("");
-            orderItemVO.setReceiver("");
-        }
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public OrderItemVO SetOrder(OrderItemDto orderItemDto) {
-        Long userId = BaseContext.getCurrentId();
-        if (!userId.equals(orderItemDto.getUserId())) {
-            throw new EmptyException(MessageConstant.ORDER_NO_PERMISSION);
-        }
-
-        int count = orderItemDto.getCount() == null ? 1 : orderItemDto.getCount();
-        Goods goods = goodsMapper.selectByPrimaryKey(orderItemDto.getGoodsId());
-        if (goods == null) {
-            throw new EmptyException(MessageConstant.GOODS_NOT_EXIST);
-        }
-        if (goods.getStock() != null && goods.getStock() < count) {
-            throw new EmptyException(MessageConstant.STOCK_NOT_ENOUGH);
-        }
-
-        int affected = goodsMapper.decreaseStock(goods.getId(), count);
-        if (affected == 0) {
-            throw new EmptyException(MessageConstant.STOCK_NOT_ENOUGH);
-        }
-
-        Orders orders = Orders.builder()
-                .orderNo(orderItemDto.getOrderNo())
-                .userId(orderItemDto.getUserId())
-                .totalAmount(orderItemDto.getTotalAmount())
-                .addressDetail(orderItemDto.getAddressDetail())
-                .phone(orderItemDto.getPhone())
-                .receiver(orderItemDto.getReceiver())
-                .buyerLongitude(orderItemDto.getBuyerLongitude())
-                .buyerLatitude(orderItemDto.getBuyerLatitude())
-                .shopLongitude(orderItemDto.getShopLongitude())
-                .shopLatitude(orderItemDto.getShopLatitude())
-                .shopConfigId(orderItemDto.getGoodsConfigId())
-                .createTime(LocalDateTime.now())
-                .payTime(LocalDateTime.now())
-                .status(OrderStatusConstant.PAID_PENDING_ACCEPT)
-                .build();
-
-        orderMapper.insert(orders);
-
-        OrderItem orderItem = OrderItem.builder()
-                .orderNo(orderItemDto.getOrderNo())
-                .goodsId(goods.getId())
-                .goodsName(goods.getGoodsName())
-                .goodsImg(goods.getGoodsImg())
-                .price(goods.getPrice())
-                .count(count)
-                .createTime(LocalDateTime.now())
-                .build();
-        orderItemMapper.insert(orderItem);
-
-        OrderItemVO orderItemVO = new OrderItemVO();
-        BeanUtils.copyProperties(orders, orderItemVO);
-        orderItemVO.setGoodsConfigId(orders.getShopConfigId());
-        orderItemVO.setGoodsId(goods.getId());
-        orderItemVO.setCount(count);
-        return orderItemVO;
-    }
-
-    @Override
-    public Long addShopConfig(ShopConfigDto dto) {
-        Long userId = BaseContext.getCurrentId();
-        ShopConfig config = ShopConfig.builder()
-                .shopName(dto.getShopName())
-                .shopAddress(dto.getShopAddress())
-                .longitude(dto.getLongitude())
-                .latitude(dto.getLatitude())
-                .updateTime(LocalDateTime.now())
-                .userId(userId)
-                .build();
-        goodsMapper.insertShopConfig(config);
-        return config.getId();
-    }
-
-    @Override
-    public List<ShopConfigShowConfigVO> showShopsConfig() {
-        Long userId = BaseContext.getCurrentId();
-        return shopMapper.selectShopConfigByUserId(userId);
-    }
-
-    @Override
-    public PageResult orderAll(OrdersPageDto ordersPageDto) {
-        Long userId = BaseContext.getCurrentId();
-        List<Long> shopConfigIds = shopMapper.selectShopConfigIdsByUserId(userId);
-        if (shopConfigIds == null || shopConfigIds.isEmpty()) {
-            return new PageResult(0L, Collections.emptyList());
-        }
-        PageHelper.startPage(ordersPageDto.getPage(), ordersPageDto.getPageSize());
-        Page<MyOrdersVO> page = orderMapper.selectByShopConfigIds(shopConfigIds);
-        return new PageResult(page.getTotal(), page.getResult());
-    }
-
-    @Override
-    public void acceptOrder(Long id) {
-        assertMerchantOrder(id);
-        orderMapper.acceptOrder(id);
-    }
-
-    @Override
-    public void cancelOrder(Long id) {
-        assertMerchantOrder(id);
-        orderMapper.cancelOrder(id);
-    }
-
-    @Override
-    public void completeOrder(Long id) {
-        assertMerchantOrder(id);
-        orderMapper.completeOrder(id);
-    }
-
-    @Override
-    public void deleteOrder(Long id) {
-        assertMerchantOrder(id);
-        orderMapper.deleteOrder(id);
-    }
-
-    @Override
-    public PageResult MyOrder(OrdersPageDto ordersPageDto) {
-        Long userId = BaseContext.getCurrentId();
-        PageHelper.startPage(ordersPageDto.getPage(), ordersPageDto.getPageSize());
-        Page<MyOrdersVO> ordersPage = orderMapper.selectMyOrder(ordersPageDto, userId);
-        return new PageResult(ordersPage.getTotal(), ordersPage.getResult());
-    }
-
-    @Override
-    public MyOrdersVO myOrderDetail(Long id) {
-        Long userId = BaseContext.getCurrentId();
-        Orders orders = orderMapper.selectById(id);
-        if (orders == null) {
-            throw new EmptyException(MessageConstant.ORDER_NOT_EXIST);
-        }
-        if (!userId.equals(orders.getUserId()) && !isMerchantOfOrder(userId, orders)) {
-            throw new EmptyException(MessageConstant.ORDER_NO_PERMISSION);
-        }
-        MyOrdersVO vo = new MyOrdersVO();
-        BeanUtils.copyProperties(orders, vo);
         return vo;
     }
 
+    /**
+     * 商家修改商品信息
+     * 安全校验：
+     * 1. 商品必须存在且未删除
+     * 2. 商品必须属于当前登录商家（通过 goodsConfigId 关联到 shop_config 的 userId）
+     * 防止商家A修改商家B的商品
+     */
     @Override
-    public void confirmOrder(Long id) {
+    public GoodsDetailVO updateGoods(Long goodsId, GoodsUpdateDto dto) {
         Long userId = BaseContext.getCurrentId();
-        int rows = orderMapper.confirmOrder(id, userId);
-        if (rows == 0) {
-            throw new EmptyException(MessageConstant.ORDER_STATUS_ERROR);
+
+        Goods goods = goodsMapper.selectById(goodsId);
+        if (goods == null || goods.getDeleted() == 1) {
+            throw new BaseException(CodeException.NOT_FOUND, "商品不存在");
         }
+
+        ShopConfig shop = shopConfigMapper.selectById(goods.getGoodsConfigId());
+        if (shop == null || !shop.getUserId().equals(userId)) {
+            throw new BaseException(CodeException.FORBIDDEN, "无权操作该商品");
+        }
+
+        BeanUtils.copyProperties(dto, goods);
+        goods.setId(goodsId);
+        goods.setUpdateTime(LocalDateTime.now());
+
+        // 1. 先更新数据库（保证数据库一定成功）
+        goodsMapper.update(goods);
+
+        // 2. 再删除缓存（下次查询自动从数据库加载并回写缓存）
+        redisUtil.deleteGoods(goodsId);
+
+        // 3. 返回最新数据（直接查库，不走缓存，避免读到旧值）
+        Goods fresh = goodsMapper.selectById(goodsId);
+        return toDetailVO(fresh);
     }
 
+
+    /**
+     * 商家删除商品（逻辑删除）
+     * 将 deleted 置为 1，而非物理删除
+     * 原因：历史订单中存有商品快照（goodsName/goodsImg/price），
+     *      物理删除会导致订单详情无法关联商品信息
+     * 安全校验同修改：只能删除自己的商品
+     */
     @Override
-    public void cancelMylOrder(Long id) {
+    public void deleteGoods(Long goodsId) {
         Long userId = BaseContext.getCurrentId();
-        int rows = orderMapper.cancelMyOrderByUser(id, userId);
-        if (rows == 0) {
-            throw new EmptyException(MessageConstant.ORDER_STATUS_ERROR);
+
+        Goods goods = goodsMapper.selectById(goodsId);
+        if (goods == null || goods.getDeleted() == 1) {
+            throw new BaseException(CodeException.NOT_FOUND, "商品不存在");
         }
-    }
 
-    @Override
-    public void updateDeliveryLocation(Long id, DeliveryLocationDto dto) {
-        assertMerchantOrder(id);
-        orderMapper.updateDeliveryLocation(id, dto.getDeliveryLongitude(), dto.getDeliveryLatitude());
-    }
-
-    @Override
-    public void updateGoods(GoodsUpdateDto goodsUpdateDto) {
-        if (goodsUpdateDto.getId() == null) {
-            throw new EmptyException(MessageConstant.GOODS_NOT_EXIST);
+        ShopConfig shop = shopConfigMapper.selectById(goods.getGoodsConfigId());
+        if (shop == null || !shop.getUserId().equals(userId)) {
+            throw new BaseException(CodeException.FORBIDDEN, "无权操作该商品");
         }
-        goodsMapper.updateGoods(goodsUpdateDto);
+
+        goodsMapper.logicDelete(goodsId);
+
+        // 删除缓存
+        redisUtil.deleteGoods(goodsId);
     }
 
+
+    /**
+     * 商家上下架商品
+     * status: 0下架（用户端不可见） 1上架（用户端可见）
+     * 安全校验同修改
+     */
     @Override
-    public List<UserAddressVO> MyAddress() {
+    public void updateGoodsStatus(Long goodsId, Integer status) {
+        if (status != 0 && status != 1) {
+            throw new BaseException(CodeException.PARAM_ERROR, "状态参数错误");
+        }
+
         Long userId = BaseContext.getCurrentId();
-        return userAddressMapper.selectMyAddress(userId);
+
+        Goods goods = goodsMapper.selectById(goodsId);
+        if (goods == null || goods.getDeleted() == 1) {
+            throw new BaseException(CodeException.NOT_FOUND, "商品不存在");
+        }
+
+        ShopConfig shop = shopConfigMapper.selectById(goods.getGoodsConfigId());
+        if (shop == null || !shop.getUserId().equals(userId)) {
+            throw new BaseException(CodeException.FORBIDDEN, "无权操作该商品");
+        }
+
+        goodsMapper.updateStatus(goodsId, status);
+
+        // 状态变更后清缓存
+        redisUtil.deleteGoods(goodsId);
     }
 
+    /**
+     * 商家查询自己店铺的商品列表（分页）
+     * 用于商家后台管理，可查看全部商品（包括下架的）
+     * 支持按商品名称模糊搜索、按状态筛选
+     */
     @Override
-    public UserAddressVO MyAddressShow(Long id) {
+    public PageResult<GoodsPageVO> queryMyGoodsList(GoodsQueryDto dto) {
         Long userId = BaseContext.getCurrentId();
-        UserAddress userAddress = userAddressMapper.selectByIdAndUserId(id, userId);
-        if (userAddress == null) {
-            throw new EmptyException(MessageConstant.USER_ADDRESS_NOT_EXIST);
+        ShopConfig shop = shopConfigMapper.selectByUserId(userId);
+        if (shop == null) {
+            return new PageResult<>();
         }
-        UserAddressVO userAddressVO = new UserAddressVO();
-        BeanUtils.copyProperties(userAddress, userAddressVO);
-        return userAddressVO;
+
+        dto.setShopConfigId(shop.getId());
+        PageHelper.startPage(dto.getPageNum(), dto.getPageSize());
+
+        List<Goods> list = goodsMapper.selectByCondition(dto);
+        Page<Goods> page = (Page<Goods>) list;
+
+        List<GoodsPageVO> voList = list.stream()
+                .map(this::toPageVO)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(page.getTotal(), voList);
     }
 
+    /**
+     * 用户端查询商品列表（分页）
+     * 过滤条件：
+     * 1. status = 1（只展示上架商品）
+     * 2. deleted = 0（只展示未删除商品）
+     * 3. stock > 0（可选，根据业务决定是否只展示有库存的）
+     * 支持按店铺筛选、按名称搜索
+     */
+    /**
+     * 用户端商品列表（分页）
+     * 列表页数据变化快，一般不加缓存；如果加，过期时间设短（1-2分钟）
+     */
     @Override
-    public void MyAddressUpdate(Long id, UserAddressDto userAddressDto) {
-        Long userId = BaseContext.getCurrentId();
-        UserAddress exist = userAddressMapper.selectByIdAndUserId(id, userId);
-        if (exist == null) {
-            throw new EmptyException(MessageConstant.USER_ADDRESS_NOT_EXIST);
-        }
-        userAddressDto.setId(id);
-        if (userAddressDto.getIsDefault() != null && userAddressDto.getIsDefault() == 1) {
-            UserAddressDto resetDefault = new UserAddressDto();
-            resetDefault.setUserId(userId);
-            resetDefault.setIsDefault(0);
-            userAddressMapper.updateMyAddressDefault(resetDefault);
-        }
-        userAddressMapper.updateMyAddress(userAddressDto);
+    public PageResult<GoodsPageVO> queryUserGoodsList(GoodsQueryDto dto) {
+        dto.setStatus(1);
+        PageHelper.startPage(dto.getPageNum(), dto.getPageSize());
+        List<Goods> list = goodsMapper.selectUserGoodsList(dto);
+        Page<Goods> page = (Page<Goods>) list;
+
+        List<GoodsPageVO> voList = list.stream()
+                .map(this::toPageVO)
+                .collect(Collectors.toList());
+
+        return new PageResult<>(page.getTotal(), voList);
     }
 
+    /**
+     * 查询商品详情（核心缓存逻辑）
+     * 流程：
+     * 1. 先读 Redis 缓存
+     * 2. 缓存命中直接返回
+     * 3. 缓存未命中，查数据库
+     * 4. 数据库结果写入 Redis，再返回
+     */
     @Override
-    public void MyAddressAdd(UserAddressDto userAddressDto) {
-        Long userId = BaseContext.getCurrentId();
-        userAddressDto.setUserId(userId);
-        if (userAddressDto.getIsDefault() == null) {
-            userAddressDto.setIsDefault(0);
+    public GoodsDetailVO getGoodsDetail(Long goodsId) {
+        // 1. 查缓存
+        Object cache = redisUtil.getGoods(goodsId);
+        if (cache != null) {
+            return (GoodsDetailVO) cache;
         }
-        if (userAddressDto.getIsDefault() == 1) {
-            UserAddressDto resetDefault = new UserAddressDto();
-            resetDefault.setUserId(userId);
-            resetDefault.setIsDefault(0);
-            userAddressMapper.updateMyAddressDefault(resetDefault);
+
+        // 2. 缓存未命中，查数据库
+        Goods goods = goodsMapper.selectById(goodsId);
+        if (goods == null || goods.getDeleted() == 1) {
+            throw new BaseException(CodeException.NOT_FOUND, "商品不存在");
         }
-        userAddressMapper.insertMyAddress(userAddressDto);
+
+        // 3. 组装 VO
+        GoodsDetailVO vo = toDetailVO(goods);
+
+        // 4. 写入缓存（带过期时间，防止冷数据长期占用内存）
+        redisUtil.setGoods(goodsId, vo, GOODS_CACHE_MINUTES);
+
+        return vo;
     }
 
-    @Override
-    public void MyAddressDelete(Long id) {
-        Long userId = BaseContext.getCurrentId();
-        int rows = userAddressMapper.deleteMyAddress(id, userId);
-        if (rows == 0) {
-            throw new EmptyException(MessageConstant.USER_ADDRESS_NOT_EXIST);
-        }
+    // ==================== 私有转换方法 ====================
+
+    /**
+     * 将 Goods 实体转换为详情 VO
+     * 包含完整商品信息，用于商品详情页展示
+     */
+    private GoodsDetailVO toDetailVO(Goods goods) {
+        return GoodsDetailVO.builder()
+                .id(goods.getId())
+                .goodsName(goods.getGoodsName())
+                .goodsImg(goods.getGoodsImg())
+                .content(goods.getContent())
+                .price(goods.getPrice())
+                .unit(goods.getUnit())
+                .stock(goods.getStock())
+                .sales(goods.getSales())
+                .status(goods.getStatus())
+                .goodsConfigId(goods.getGoodsConfigId())
+                .createTime(goods.getCreateTime())
+                .build();
     }
 
-    private void assertMerchantOrder(Long orderId) {
-        Long userId = BaseContext.getCurrentId();
-        Orders orders = orderMapper.selectById(orderId);
-        if (orders == null) {
-            throw new EmptyException(MessageConstant.ORDER_NOT_EXIST);
-        }
-        if (!isMerchantOfOrder(userId, orders)) {
-            throw new EmptyException(MessageConstant.ORDER_NO_PERMISSION);
-        }
-    }
-
-    private boolean isMerchantOfOrder(Long userId, Orders orders) {
-        List<Long> shopConfigIds = shopMapper.selectShopConfigIdsByUserId(userId);
-        return shopConfigIds != null && shopConfigIds.contains(orders.getShopConfigId());
+    /**
+     * 将 Goods 实体转换为列表页 VO
+     * 精简字段，减少列表页数据传输量
+     */
+    private GoodsPageVO toPageVO(Goods goods) {
+        return GoodsPageVO.builder()
+                .id(goods.getId())
+                .goodsName(goods.getGoodsName())
+                .goodsImg(goods.getGoodsImg())
+                .price(goods.getPrice())
+                .unit(goods.getUnit())
+                .stock(goods.getStock())
+                .sales(goods.getSales())
+                .status(goods.getStatus())
+                .build();
     }
 }
